@@ -1,8 +1,6 @@
 import chainlit as cl
 from rag_chain import RAGChain
 
-#celenium
-
 rag_chain = RAGChain(force_push=False)
 
 def extract_text(content) -> str:

@@ -34,6 +34,7 @@ CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 # TODO : [ ] SPARSE + Compressed reranker
 # TODO : [ ] Environnement D'api keys
 # TODO : [x] Langfuse
+# TODO : [ ] Fetch from url when embedding (get the most updated version of documentation) -> (https://selenium-python.readthedocs.io/installation.html)
 # TODO : [ ] Dockerfile, Makefile
 
 class RAGChain:
