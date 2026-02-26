@@ -1,0 +1,20 @@
+[project]
+name = "rag-pipeline"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "bs4>=0.0.2",
+    "chainlit>=2.9.6",
+    "langchain>=0.3.27",
+    "langchain-community>=0.4.1",
+    "langchain-mistralai>=1.1.1",
+    "langchain-ollama>=1.0.1",
+    "langchain-qdrant>=1.1.0",
+    "langchain-text-splitters>=1.1.1",
+    "langfuse>=3.14.5",
+    "ollama>=0.6.1",
+    "qdrant-client>=1.17.0",
+    "tiktoken>=0.12.0",
+]

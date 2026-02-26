@@ -1,0 +1,1 @@
+#uv run chainlit run src/chainlit_app.py
