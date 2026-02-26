@@ -23,8 +23,8 @@ LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
 LANGFUSE_HOST_URL = os.getenv("LANGFUSE_HOST_URL")
 
 # ====== SETTINGS ======
-CHUNK_SIZE = os.getenv("CHUNK_SIZE")
-CHUNK_OVERLAP = os.getenv("CHUNK_OVERLAP")
-TOP_K = os.getenv("TOP_K")
-THRESHOLD = os.getenv("THRESHOLD")
-VERBOSE = os.getenv("VERBOSE")
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP"))
+TOP_K = int(os.getenv("TOP_K"))
+THRESHOLD = float(os.getenv("THRESHOLD"))
+VERBOSE = True if os.getenv("VERBOSE") == "True" else False

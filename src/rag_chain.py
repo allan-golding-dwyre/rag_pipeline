@@ -46,7 +46,7 @@ class RAGChain:
         self.embedding = MistralAIEmbeddings(model=config.EMBEDDING_MODEL, api_key=config.MISTRAL_KEY)
         self.llm = ChatMistralAI(model_name=config.LANGUAGE_MODEL, api_key=config.MISTRAL_KEY)
 
-        self.client = QdrantClient(url=config.QDRANT_ENDPOINT, api_key=config.QDRANT_KEY, port=None)
+        self.client = QdrantClient(url=config.QDRANT_URL, api_key=config.QDRANT_KEY, port=None)
         self.vector_store = self._setup_vector_store(force_push)
 
         #NOTE : Si je fais seulement du Dense
@@ -67,7 +67,7 @@ class RAGChain:
         #     base_retriever=hybrid_retriever
         # )
 
-        self.langfuse = Langfuse(public_key=config.LF_PKEY, secret_key=config.LF_SKEY, host=config.LF_HOST)
+        self.langfuse = Langfuse(public_key=config.LANGFUSE_PUBLIC_KEY, secret_key=config.LANGFUSE_SECRET_KEY, host=config.LANGFUSE_HOST_URL)
         self.chain = self._create_chain()
 
     async def ask(self, question: str, chat_history: List[dict], session_id = -1):
