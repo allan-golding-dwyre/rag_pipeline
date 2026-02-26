@@ -20,7 +20,6 @@ async def handle_message(message: cl.Message):
     chat_history = cl.user_session.get("chat_history") or []
 
     response_message = await cl.Message(content="🤔 Réflexion…\n").send()
-    await response_message.send()
 
     session_id = cl.user_session.get("id")
     full_response = ""

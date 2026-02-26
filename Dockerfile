@@ -58,4 +58,4 @@ COPY documents ./documents
 COPY prompts ./prompts
 
 EXPOSE 8080
-CMD ["uv", "run", "chainlit", "run", "src/chainlit_app.py"]
+CMD ["uv", "run", "chainlit", "run", "src/chainlit_app.py", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,41 +1,37 @@
-from typing import List
+from operator import itemgetter
+from pathlib import Path
+from typing import List, Any
 
-#https://www.datacamp.com/fr/courses/retrieval-augmented-generation-rag-with-langchain
+# https://www.datacamp.com/fr/courses/retrieval-augmented-generation-rag-with-langchain
 from langchain_core.documents import Document
-from langchain_qdrant import QdrantVectorStore, FastEmbedSparse, RetrievalMode
-
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
+from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.messages import HumanMessage, AIMessage
-
-#from langchain_ollama import OllamaEmbeddings, OllamaLLM
-from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
-
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnableConfig
 
+# from langchain_ollama import OllamaEmbeddings, OllamaLLM
+from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, VectorParams
-from pathlib import Path
+
 import config
 from documentation_loader import DocumentationLoader
 
-from langfuse import Langfuse, propagate_attributes, get_client as langfuse_get_client
-from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
-
-from operator import itemgetter
+from rich import print
 
 PROMPT_DIR = Path("prompts")
 STRICT_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_STRICT.md"
 CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 
 # TODO : [ ] SPARSE + Compressed reranker
-# TODO : [ ] Environnement D'api keys
+# TODO : [x] Environnement D'api keys
 # TODO : [x] Langfuse
 # TODO : [ ] Fetch from url when embedding (get the most updated version of documentation) -> (https://selenium-python.readthedocs.io/installation.html)
-# TODO : [ ] Dockerfile, Makefile
+# TODO : [x] Dockerfile, Makefile
 
 class RAGChain:
     def __init__(self, documents_path="documents", force_push=False):
@@ -67,10 +63,9 @@ class RAGChain:
         #     base_retriever=hybrid_retriever
         # )
 
-        self.langfuse = Langfuse(public_key=config.LANGFUSE_PUBLIC_KEY, secret_key=config.LANGFUSE_SECRET_KEY, host=config.LANGFUSE_HOST_URL)
         self.chain = self._create_chain()
 
-    async def ask(self, question: str, chat_history: List[dict], session_id = -1):
+    async def ask(self, question: Any, chat_history: List[dict], session_id = -1):
         inputs = {
             "question": question,
             "chat_history": chat_history,
@@ -86,13 +81,10 @@ class RAGChain:
         )
 
         # --- Async call to the pipeline ---
-        try: # We do a try to avoid the HTTP (asyncio) error from when the stream close early
-            async for chunk in self.chain.astream(inputs, config=stream_config):
-                yield chunk
-        finally:
-            # ferme proprement le générateur pour httpcore
-            if hasattr(self.chain, "astream") and hasattr(self.chain.astream, "aclose"):
-                await self.chain.astream.aclose()
+        stream = self.chain.astream(inputs, config=stream_config)
+        async for chunk in stream:
+            yield chunk
+
 
 
     def _setup_vector_store(self, force_push=False):
