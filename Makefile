@@ -16,6 +16,7 @@ install:
 build-image:
 	docker build . -t chainlit \
 		--build-arg EMBEDDING_MODEL=${EMBEDDING_MODEL}\
+		--build-arg SPARSE_EMBEDDING_MODEL=${SPARSE_EMBEDDING_MODEL}\
 		--build-arg LANGUAGE_MODEL=${LANGUAGE_MODEL} \
 		--build-arg MISTRAL_KEY=${MISTRAL_KEY} \
 		--build-arg QDRANT_KEY=${QDRANT_KEY} \

@@ -3,6 +3,7 @@ LABEL authors="allan.golding-dwyre@vidal.fr"
 
 # ====== Models ======
 ARG EMBEDDING_MODEL
+ARG SPARSE_EMBEDDING_MODEL
 ARG LANGUAGE_MODEL
 
 # --- Auth ---
@@ -29,6 +30,7 @@ ARG VERBOSE=False
 
 # ============ DEFINE ENV ============
 ENV EMBEDDING_MODEL=${EMBEDDING_MODEL} \
+    SPARSE_EMBEDDING_MODEL=${SPARSE_EMBEDDING_MODEL} \
     LANGUAGE_MODEL=${LANGUAGE_MODEL} \
     MISTRAL_KEY=${MISTRAL_KEY} \
     QDRANT_KEY=${QDRANT_KEY} \

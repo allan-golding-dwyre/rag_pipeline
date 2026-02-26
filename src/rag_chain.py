@@ -2,6 +2,8 @@ from operator import itemgetter
 from pathlib import Path
 from typing import List, Any
 
+from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 # https://www.datacamp.com/fr/courses/retrieval-augmented-generation-rag-with-langchain
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, AIMessage
@@ -9,14 +11,15 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnableConfig
+from langchain_classic.retrievers import ContextualCompressionRetriever
 
 # from langchain_ollama import OllamaEmbeddings, OllamaLLM
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
-from langchain_qdrant import QdrantVectorStore
+from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, VectorParams
+from qdrant_client.http.models import Distance, VectorParams, SparseVectorParams, Modifier
 
 import config
 from documentation_loader import DocumentationLoader
@@ -27,7 +30,9 @@ PROMPT_DIR = Path("prompts")
 STRICT_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_STRICT.md"
 CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 
-# TODO : [ ] SPARSE + Compressed reranker
+# NOTE : AVEC SPARSE + Compressed reranker (sans Cohere) on perds le score. et on peut plus filtrer par rapport lui
+# TODO : [x] SPARSE + Compressed reranker
+# TODO : [ ] Change reranker from HuggingFace to CohereRerank [Cohere](https://cohere.com/fr)
 # TODO : [x] Environnement D'api keys
 # TODO : [x] Langfuse
 # TODO : [ ] Fetch from url when embedding (get the most updated version of documentation) -> (https://selenium-python.readthedocs.io/installation.html)
@@ -36,32 +41,34 @@ CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 class RAGChain:
     def __init__(self, documents_path="documents", force_push=False):
         print("init the RAG chain")
-        #self.threshold = config.THRESHOLD
+        self.threshold = config.THRESHOLD
         self.documents_paths = list(Path(documents_path).glob("*.html"))
 
         self.embedding = MistralAIEmbeddings(model=config.EMBEDDING_MODEL, api_key=config.MISTRAL_KEY)
+        self.sparse_embedding = FastEmbedSparse(model_name=config.SPARSE_EMBEDDING_MODEL)
+
         self.llm = ChatMistralAI(model_name=config.LANGUAGE_MODEL, api_key=config.MISTRAL_KEY)
 
         self.client = QdrantClient(url=config.QDRANT_URL, api_key=config.QDRANT_KEY, port=None)
         self.vector_store = self._setup_vector_store(force_push)
 
         #NOTE : Si je fais seulement du Dense
-        self.retriever = self.vector_store.as_retriever(
-            search_type="similarity_score_threshold",
-            search_kwargs={"k": config.TOP_K, 'score_threshold': config.THRESHOLD}
+        # self.retriever = self.vector_store.as_retriever(
+        #     search_type="similarity_score_threshold",
+        #     search_kwargs={"k": config.TOP_K, 'score_threshold': config.THRESHOLD}
+        # )
+        base_retriever = self.vector_store.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": config.TOP_K * 2,}
         )
-        # base_retriever = self.vector_store.as_retriever(
-        #     search_type="similarity",
-        #     search_kwargs={"k": config.TOP_K * 2,}
-        # )
         # NOTE : pour plus tard : CohereRerank (api payante) alternative local :
-        # reranker = CrossEncoderReranker(model=c"ross-encoder/ms-marco-MiniLM-L-6-v2", top_n=config.TOP_K)
-        #
-        #
-        # self.retriever = ContextualCompressionRetriever(
-        #     base_compressor=reranker,
-        #     base_retriever=hybrid_retriever
-        # )
+        cross_encoder = HuggingFaceCrossEncoder(model_name="cross-encoder/ms-marco-MiniLM-L-6-v2")
+        reranker = CrossEncoderReranker(model=cross_encoder, top_n=config.TOP_K)
+
+        self.retriever = ContextualCompressionRetriever(
+            base_retriever=base_retriever,
+            base_compressor=reranker
+        )
 
         self.chain = self._create_chain()
 
@@ -89,25 +96,33 @@ class RAGChain:
 
     def _setup_vector_store(self, force_push=False):
         vector_size = len(self.embedding.embed_query("sample text"))
-        collection_exists = self.client.collection_exists(config.QDRANT_COLLECTION)
 
-        if force_push:
-            self.client.delete_collection(config.QDRANT_COLLECTION)
-            collection_exists = False
-
-        if not collection_exists:
-            self.client.create_collection(
+        def setup_collection():
+            return self.client.create_collection(
                 collection_name=config.QDRANT_COLLECTION,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+                sparse_vectors_config={
+                    config.SPARSE_EMBEDDING_MODEL : SparseVectorParams(modifier=Modifier.IDF)
+                },
             )
+
+        # NOTE : Si la collection n'existe pas, on la crée. Sinon, si on veut forcé un recreation de la collection, on la delete et creer
+        if not self.client.collection_exists(config.QDRANT_COLLECTION):
+            setup_collection()
+        elif force_push:
+            self.client.delete_collection(config.QDRANT_COLLECTION)
+            setup_collection()
 
         vector_store = QdrantVectorStore(
             client=self.client,
             collection_name=config.QDRANT_COLLECTION,
+            retrieval_mode=RetrievalMode.HYBRID,
             embedding=self.embedding,
+            sparse_embedding= self.sparse_embedding,
+            sparse_vector_name=config.SPARSE_EMBEDDING_MODEL
         )
 
-        if collection_exists:
+        if not force_push:
             return vector_store
 
         print("embedding des documents")
@@ -206,6 +221,7 @@ class RAGChain:
 
         def format_docs(docs : List[Document]):
             # filtered_docs = [doc for doc in docs if self.threshold < get_score(doc) ]
+            # print(docs[0])
             formatted_docs = []
             for doc in docs:
 

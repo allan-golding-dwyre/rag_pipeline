@@ -6,6 +6,7 @@ load_dotenv()
 
 # ====== Models ======
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+SPARSE_EMBEDDING_MODEL = os.getenv("SPARSE_EMBEDDING_MODEL")
 LANGUAGE_MODEL = os.getenv("LANGUAGE_MODEL")
 # --- Auth ---
 MISTRAL_KEY = SecretStr(os.getenv("MISTRAL_KEY"))
