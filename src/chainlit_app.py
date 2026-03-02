@@ -1,7 +1,7 @@
 import chainlit as cl
 from rag_chain import RAGChain
 
-rag_chain = RAGChain(force_push=False)
+rag_chain = RAGChain()
 
 def extract_text(content) -> str:
     if isinstance(content, str):

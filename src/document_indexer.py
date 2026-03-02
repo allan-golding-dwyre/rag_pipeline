@@ -49,6 +49,7 @@ class DocumentIndexer:
     def index_documents(self, loader : BaseDocumentationLoader):
         print("Chargements des documents ...")
         docs = loader.load()
+        print("Documents trouvées :", len(docs))
 
         print("Embedding des documents")
         splitter = RecursiveCharacterTextSplitter(

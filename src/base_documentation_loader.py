@@ -22,7 +22,7 @@ class BaseDocumentationLoader(BaseLoader, ABC):
         return documents
 
     def _create_documents(self, html: str) -> List[Document]:
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, 'lxml')
         article = soup.find("div", itemprop="articleBody")
         doc_title = soup.find("meta", property="og:title")["content"]
         doc_url = soup.find("meta", property="og:url")["content"]
