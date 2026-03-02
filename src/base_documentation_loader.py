@@ -1,25 +1,27 @@
-from pathlib import Path
-from typing import List
+from abc import abstractmethod, ABC
+from typing import List, Iterable
 
 from bs4 import BeautifulSoup
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 
 
-class DocumentationLoader(BaseLoader):
-    def __init__(self, paths : List[Path], verbose=False):
-        self.paths = paths
+class BaseDocumentationLoader(BaseLoader, ABC):
+    def __init__(self, verbose=False):
         self.verbose = verbose
+
+    @abstractmethod
+    def _get_html_sources(self) -> Iterable[str]:
+        pass
 
     def load(self) -> List[Document]:
         """Load the documentation for each file."""
         documents = []
-        for filepath in self.paths:
-            documents.extend(self._create_documents(filepath))
+        for html in self._get_html_sources():
+            documents.extend(self._create_documents(html))
         return documents
 
-    def _create_documents(self, filepath : Path) -> List[Document]:
-        html = filepath.read_text(encoding="utf-8")
+    def _create_documents(self, html: str) -> List[Document]:
         soup = BeautifulSoup(html, 'html.parser')
         article = soup.find("div", itemprop="articleBody")
         doc_title = soup.find("meta", property="og:title")["content"]
@@ -45,7 +47,6 @@ class DocumentationLoader(BaseLoader):
                     metadata = {
                         "title": doc_title,
                         "url": doc_url,
-                        "source": str(filepath),
                         "section" : section["title"],
                         "has_code": section["has_code"],
                         "preview": section["content"][:100]

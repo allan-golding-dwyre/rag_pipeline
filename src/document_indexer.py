@@ -1,5 +1,4 @@
 # TODO : [ ] Upsert by batchs
-from langchain_core.document_loaders import BaseLoader
 from langchain_mistralai import MistralAIEmbeddings
 
 from src import config
@@ -7,6 +6,9 @@ from qdrant_client.http.models import Distance, VectorParams, SparseVectorParams
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
 from qdrant_client import QdrantClient
+
+from src.base_documentation_loader import BaseDocumentationLoader
+
 
 class DocumentIndexer:
     def __init__(self, reset_collection = True):
@@ -44,7 +46,7 @@ class DocumentIndexer:
             sparse_vector_name=config.SPARSE_EMBEDDING_MODEL
         )
 
-    def index_documents(self, loader : BaseLoader):
+    def index_documents(self, loader : BaseDocumentationLoader):
         print("Embedding des documents")
 
         docs = loader.load()
