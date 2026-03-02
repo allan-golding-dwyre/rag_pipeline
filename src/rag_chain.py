@@ -10,7 +10,6 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import MessagesPlaceholder
-from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnableConfig
 from langchain_classic.retrievers import ContextualCompressionRetriever
 
@@ -26,15 +25,11 @@ PROMPT_DIR = Path("prompts")
 STRICT_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_STRICT.md"
 CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 
-# NOTE : AVEC SPARSE + Compressed reranker (sans Cohere) on perds le score. et on peut plus filtrer par rapport lui
-# TODO : [x] SPARSE + Compressed reranker
+# TODO : [x] Split chunk by tokens and not the number of characters
+# TODO : [ ] Batching embedding to VectorStore
 # TODO : [ ] Find a way to filter via score
-# TODO : [x] Split the rag chain builder and the embedding process
 # TODO : [ ] Change reranker from HuggingFace to CohereRerank [Cohere](https://cohere.com/fr)
-# TODO : [x] Environnement D'api keys
-# TODO : [x] Langfuse
-# TODO : [ ] Fetch from url when embedding (get the most updated version of documentation) -> (https://selenium-python.readthedocs.io/installation.html)
-# TODO : [x] Dockerfile, Makefile
+# TODO : [x] Fetch from url when embedding (get the most updated version of documentation) -> (https://selenium-python.readthedocs.io/installation.html)
 
 class RAGChain:
     def __init__(self):
