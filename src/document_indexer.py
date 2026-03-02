@@ -47,10 +47,10 @@ class DocumentIndexer:
         )
 
     def index_documents(self, loader : BaseDocumentationLoader):
-        print("Embedding des documents")
-
+        print("Chargements des documents ...")
         docs = loader.load()
 
+        print("Embedding des documents")
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=config.CHUNK_SIZE,
             chunk_overlap=config.CHUNK_OVERLAP,
