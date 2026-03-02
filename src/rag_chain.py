@@ -10,20 +10,16 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts import MessagesPlaceholder
+from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import RunnableParallel, RunnableLambda, RunnableConfig
 from langchain_classic.retrievers import ContextualCompressionRetriever
 
-# from langchain_ollama import OllamaEmbeddings, OllamaLLM
 from langchain_mistralai import ChatMistralAI, MistralAIEmbeddings
 from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, VectorParams, SparseVectorParams, Modifier
 
 import config
-from documentation_loader import DocumentationLoader
-
 from rich import print
 
 PROMPT_DIR = Path("prompts")
@@ -32,6 +28,8 @@ CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 
 # NOTE : AVEC SPARSE + Compressed reranker (sans Cohere) on perds le score. et on peut plus filtrer par rapport lui
 # TODO : [x] SPARSE + Compressed reranker
+# TODO : [ ] Find a way to filter via score
+# TODO : [x] Split the rag chain builder and the embedding process
 # TODO : [ ] Change reranker from HuggingFace to CohereRerank [Cohere](https://cohere.com/fr)
 # TODO : [x] Environnement D'api keys
 # TODO : [x] Langfuse
@@ -39,37 +37,12 @@ CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 # TODO : [x] Dockerfile, Makefile
 
 class RAGChain:
-    def __init__(self, documents_path="documents", force_push=False):
+    def __init__(self):
         print("init the RAG chain")
         self.threshold = config.THRESHOLD
-        self.documents_paths = list(Path(documents_path).glob("*.html"))
 
-        self.embedding = MistralAIEmbeddings(model=config.EMBEDDING_MODEL, api_key=config.MISTRAL_KEY)
-        self.sparse_embedding = FastEmbedSparse(model_name=config.SPARSE_EMBEDDING_MODEL)
-
-        self.llm = ChatMistralAI(model_name=config.LANGUAGE_MODEL, api_key=config.MISTRAL_KEY)
-
-        self.client = QdrantClient(url=config.QDRANT_URL, api_key=config.QDRANT_KEY, port=None)
-        self.vector_store = self._setup_vector_store(force_push)
-
-        #NOTE : Si je fais seulement du Dense
-        # self.retriever = self.vector_store.as_retriever(
-        #     search_type="similarity_score_threshold",
-        #     search_kwargs={"k": config.TOP_K, 'score_threshold': config.THRESHOLD}
-        # )
-        base_retriever = self.vector_store.as_retriever(
-            search_type="similarity",
-            search_kwargs={"k": config.TOP_K * 2,}
-        )
-        # NOTE : pour plus tard : CohereRerank (api payante) alternative local :
-        cross_encoder = HuggingFaceCrossEncoder(model_name="cross-encoder/ms-marco-MiniLM-L-6-v2")
-        reranker = CrossEncoderReranker(model=cross_encoder, top_n=config.TOP_K)
-
-        self.retriever = ContextualCompressionRetriever(
-            base_retriever=base_retriever,
-            base_compressor=reranker
-        )
-
+        self.vector_store = self._setup_vector_store()
+        self.retriever = self._build_retriever()
         self.chain = self._create_chain()
 
     async def ask(self, question: Any, chat_history: List[dict], session_id = -1):
@@ -92,55 +65,33 @@ class RAGChain:
         async for chunk in stream:
             yield chunk
 
+    def _build_retriever(self) :
+        base_retriever = self.vector_store.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": config.TOP_K * 2, }
+        )
+        cross_encoder = HuggingFaceCrossEncoder(model_name="cross-encoder/ms-marco-MiniLM-L-6-v2")
+        # NOTE : pour plus tard : CohereRerank (api payante) alternative local :
+        reranker = CrossEncoderReranker(model=cross_encoder, top_n=config.TOP_K)
+        return ContextualCompressionRetriever(
+            base_retriever=base_retriever,
+            base_compressor=reranker
+        )
 
+    @staticmethod
+    def _setup_vector_store() -> QdrantVectorStore:
+        embedding = MistralAIEmbeddings(model=config.EMBEDDING_MODEL, api_key=config.MISTRAL_KEY)
+        sparse_embedding = FastEmbedSparse(model_name=config.SPARSE_EMBEDDING_MODEL)
+        client = QdrantClient(url=config.QDRANT_URL, api_key=config.QDRANT_KEY, port=None)
 
-    def _setup_vector_store(self, force_push=False):
-        vector_size = len(self.embedding.embed_query("sample text"))
-
-        def setup_collection():
-            return self.client.create_collection(
-                collection_name=config.QDRANT_COLLECTION,
-                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-                sparse_vectors_config={
-                    config.SPARSE_EMBEDDING_MODEL : SparseVectorParams(modifier=Modifier.IDF)
-                },
-            )
-
-        # NOTE : Si la collection n'existe pas, on la crée. Sinon, si on veut forcé un recreation de la collection, on la delete et creer
-        if not self.client.collection_exists(config.QDRANT_COLLECTION):
-            setup_collection()
-        elif force_push:
-            self.client.delete_collection(config.QDRANT_COLLECTION)
-            setup_collection()
-
-        vector_store = QdrantVectorStore(
-            client=self.client,
+        return QdrantVectorStore(
+            client=client,
             collection_name=config.QDRANT_COLLECTION,
             retrieval_mode=RetrievalMode.HYBRID,
-            embedding=self.embedding,
-            sparse_embedding= self.sparse_embedding,
+            embedding=embedding,
+            sparse_embedding= sparse_embedding,
             sparse_vector_name=config.SPARSE_EMBEDDING_MODEL
         )
-
-        if not force_push:
-            return vector_store
-
-        print("embedding des documents")
-
-        docs = DocumentationLoader(self.documents_paths, verbose=config.VERBOSE).load()
-
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=config.CHUNK_SIZE,
-            chunk_overlap=config.CHUNK_OVERLAP,
-            length_function=len,
-            is_separator_regex=False,
-        )
-
-        chunks = splitter.split_documents(docs)
-        vector_store.add_documents(chunks)
-        print("VectorStore crée")
-
-        return vector_store
 
     @staticmethod
     def _make_chat_prompt_from_file(prompt_file_path: Path):
@@ -167,6 +118,7 @@ class RAGChain:
 
     def _create_chain(self):
         print("Création de la chaine")
+        llm = ChatMistralAI(model_name=config.LANGUAGE_MODEL, api_key=config.MISTRAL_KEY)
 
         # ici on recup les inputs important
         base = RunnableParallel(
@@ -178,7 +130,7 @@ class RAGChain:
         return (base
                 |   self.build_prompt_input()       # format history et contexts
                 |   self.select_prompt_template()   # prend à partir de history le bon template
-                |   self.llm                        # génère le message
+                |   llm                             # génère le message
                 |   StrOutputParser()               # l'envoie a chainlit
         )
 
