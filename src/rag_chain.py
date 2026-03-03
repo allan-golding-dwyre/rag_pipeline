@@ -2,7 +2,6 @@ from operator import itemgetter
 from pathlib import Path
 from typing import List, Any
 
-from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 # https://www.datacamp.com/fr/courses/retrieval-augmented-generation-rag-with-langchain
 from langchain_core.documents import Document
@@ -21,26 +20,27 @@ from qdrant_client import QdrantClient
 import config
 from rich import print
 
+from cross_encoder_rerank_threshold import CrossEncoderRerankerThreshold
+
 PROMPT_DIR = Path("prompts")
 STRICT_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_STRICT.md"
 CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 
 # TODO : [x] Split chunk by tokens and not the number of characters
 # TODO : [ ] Batching embedding to VectorStore
-# TODO : [ ] Find a way to filter via score
+# TODO : [x] Find a way to filter via score
 # TODO : [ ] Change reranker from HuggingFace to CohereRerank [Cohere](https://cohere.com/fr)
 # TODO : [x] Fetch from url when embedding (get the most updated version of documentation) -> (https://selenium-python.readthedocs.io/installation.html)
 
 class RAGChain:
     def __init__(self):
         print("init the RAG chain")
-        self.threshold = config.THRESHOLD
-
         self.vector_store = self._setup_vector_store()
         self.retriever = self._build_retriever()
         self.chain = self._create_chain()
 
     async def ask(self, question: Any, chat_history: List[dict], session_id = -1):
+        print(f"Question asked '{question}'")
         inputs = {
             "question": question,
             "chat_history": chat_history,
@@ -67,7 +67,7 @@ class RAGChain:
         )
         cross_encoder = HuggingFaceCrossEncoder(model_name="cross-encoder/ms-marco-MiniLM-L-6-v2")
         # NOTE : pour plus tard : CohereRerank (api payante) alternative local :
-        reranker = CrossEncoderReranker(model=cross_encoder, top_n=config.TOP_K)
+        reranker = CrossEncoderRerankerThreshold(model=cross_encoder, top_n=config.TOP_K, threshold=config.THRESHOLD)
         return ContextualCompressionRetriever(
             base_retriever=base_retriever,
             base_compressor=reranker
@@ -100,16 +100,6 @@ class RAGChain:
                 ("human", "{question}"),
             ]
         )
-
-    # def _search_with_scores(self, question: str) -> List[Document]:
-    #     results = self.vector_store.similarity_search_with_score(
-    #         question, k=config.TOP_K
-    #     )
-    #     docs = []
-    #     for doc, score in results:
-    #         doc.metadata["score"] = score
-    #         docs.append(doc)
-    #     return docs
 
     def _create_chain(self):
         print("Création de la chaine")
@@ -159,16 +149,7 @@ class RAGChain:
             ]
             return msgs
 
-        # def get_score(doc):
-        #     return (
-        #             doc.metadata.get("score")
-        #             or doc.metadata.get("relevance_score")
-        #             or doc.metadata.get("distance")
-        #     )
-
         def format_docs(docs : List[Document]):
-            # filtered_docs = [doc for doc in docs if self.threshold < get_score(doc) ]
-            # print(docs[0])
             formatted_docs = []
             for doc in docs:
 
