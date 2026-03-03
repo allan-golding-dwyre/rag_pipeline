@@ -34,4 +34,4 @@ THRESHOLD=0.4
 VERBOSE=False
 
 # --- online fetching ---
-CHAPTERS_TO_FETCH = ["About", "Manual"]
+CHAPTERS_TO_FETCH = ["About", "Manual", "Class reference"]
