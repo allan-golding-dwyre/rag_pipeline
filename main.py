@@ -1,20 +1,16 @@
 import argparse
-from pathlib import Path
 
 from src.document_indexer import DocumentIndexer
 from src.file_documentation_loader import FileDocumentationLoader
 from src.online_documentation_loader import OnlineDocumentationLoader
-
+# from rich import print
 
 def main():
     if args.source == "file":
         documents_paths = list(Path(args.path).glob("*.html"))
         loader = FileDocumentationLoader(documents_paths, verbose=args.verbose)
     else:
-        loader = OnlineDocumentationLoader(
-            base_url=args.base_url,
-            verbose=args.verbose
-        )
+        loader = OnlineDocumentationLoader(base_url=args.base_url, verbose=args.verbose)
 
     # --- Indexing ---
     indexer = DocumentIndexer()

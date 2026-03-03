@@ -5,9 +5,9 @@ from src.base_documentation_loader import BaseDocumentationLoader
 
 
 class FileDocumentationLoader(BaseDocumentationLoader):
-    def __init__(self, paths : List[Path], verbose=False):
+    def __init__(self, directory: str , verbose=False):
         super().__init__(verbose)
-        self.paths = paths
+        self.paths = list(Path(directory).glob("*.html"))
 
     def _get_html_sources(self) -> Iterable[str]:
         for path in self.paths:
