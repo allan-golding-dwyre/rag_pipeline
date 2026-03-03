@@ -1,3 +1,4 @@
+import contextlib
 from operator import itemgetter
 from pathlib import Path
 from typing import List, Any
@@ -26,11 +27,8 @@ PROMPT_DIR = Path("prompts")
 STRICT_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_STRICT.md"
 CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 
-# TODO : [x] Split chunk by tokens and not the number of characters
 # TODO : [ ] Batching embedding to VectorStore
-# TODO : [x] Find a way to filter via score
 # TODO : [ ] Change reranker from HuggingFace to CohereRerank [Cohere](https://cohere.com/fr)
-# TODO : [x] Fetch from url when embedding (get the most updated version of documentation) -> (https://selenium-python.readthedocs.io/installation.html)
 
 class RAGChain:
     def __init__(self):
@@ -57,8 +55,10 @@ class RAGChain:
 
         # --- Async call to the pipeline ---
         stream = self.chain.astream(inputs, config=stream_config)
-        async for chunk in stream:
-            yield chunk
+        # pour supprimer les erreurs qui ne viennent pas de nous
+        with contextlib.redirect_stderr(open('/dev/null', 'w')):
+            async for chunk in stream:
+                yield chunk
 
     def _build_retriever(self) :
         base_retriever = self.vector_store.as_retriever(
