@@ -6,6 +6,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib.parse import urljoin, urldefrag
 
+from urllib3 import Retry
+
 from src import config
 from tqdm import tqdm
 from src.base_documentation_loader import BaseDocumentationLoader
@@ -19,8 +21,14 @@ class OnlineDocumentationLoader(BaseDocumentationLoader):
         self.headers={
             "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121 Safari/537.36"
         }
+        retry_strategy = Retry(
+            total=5,
+            backoff_factor=2,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"]
+        )
 
-        adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
+        adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20, max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
 
