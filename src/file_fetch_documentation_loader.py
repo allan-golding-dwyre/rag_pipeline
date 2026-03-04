@@ -24,7 +24,10 @@ class FileFetchDocumentationLoader(BaseDocumentationLoader):
         self.chapters = ["tutorials", "about", "classes"]
 
     def _is_allow_chapter(self, filepath: str) -> bool:
-        return filepath.split("/")[1] in self.chapters
+        parts = filepath.split("/")
+        if len(parts) < 2:
+            return True
+        return parts[0] in self.chapters
 
     @staticmethod
     def _is_file_allowed(filepath: str) -> bool:
@@ -38,4 +41,5 @@ class FileFetchDocumentationLoader(BaseDocumentationLoader):
         with zipfile.ZipFile(zip_bytes) as z:
             for file in z.namelist():
                 if self._is_allow_chapter(file) and self._is_file_allowed(file):
+                    print(file, '\033[2K\033[1G')
                     yield f'{file}\n{z.read(file).decode("utf-8")}'
