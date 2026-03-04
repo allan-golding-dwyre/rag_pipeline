@@ -2,6 +2,7 @@ import argparse
 
 from src.document_indexer import DocumentIndexer
 from src.file_documentation_loader import FileDocumentationLoader
+from src.file_fetch_documentation_loader import FileFetchDocumentationLoader
 from src.git_documentation_loader import GitDocumentationLoader
 from src.online_documentation_loader import OnlineDocumentationLoader
 # from rich import print
@@ -9,6 +10,8 @@ from src.online_documentation_loader import OnlineDocumentationLoader
 def main():
     if args.source == "file":
         loader = FileDocumentationLoader(args.path, verbose=args.verbose)
+    elif args.source == "online_file":
+        loader = FileFetchDocumentationLoader( verbose=args.verbose)
     elif args.source == "git":
         loader = GitDocumentationLoader( verbose=args.verbose)
     else:
@@ -26,9 +29,9 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--source",
-        choices=["online", "file", "git"],
-        default="online",
-        help="Source of documentation (default: online)"
+        choices=["online", "file", "git", "online_file"],
+        default="online_file",
+        help="Source of documentation (default: online_file)"
     )
 
     parser.add_argument(
