@@ -2,13 +2,15 @@ import argparse
 
 from src.document_indexer import DocumentIndexer
 from src.file_documentation_loader import FileDocumentationLoader
+from src.git_documentation_loader import GitDocumentationLoader
 from src.online_documentation_loader import OnlineDocumentationLoader
 # from rich import print
 
 def main():
     if args.source == "file":
-        documents_paths = list(Path(args.path).glob("*.html"))
-        loader = FileDocumentationLoader(documents_paths, verbose=args.verbose)
+        loader = FileDocumentationLoader(args.path, verbose=args.verbose)
+    elif args.source == "git":
+        loader = GitDocumentationLoader( verbose=args.verbose)
     else:
         loader = OnlineDocumentationLoader(base_url=args.base_url, verbose=args.verbose)
 
@@ -24,7 +26,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "--source",
-        choices=["online", "file"],
+        choices=["online", "file", "git"],
         default="online",
         help="Source of documentation (default: online)"
     )
