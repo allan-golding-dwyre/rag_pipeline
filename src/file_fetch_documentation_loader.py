@@ -41,5 +41,5 @@ class FileFetchDocumentationLoader(BaseDocumentationLoader):
         with zipfile.ZipFile(zip_bytes) as z:
             for file in z.namelist():
                 if self._is_allow_chapter(file) and self._is_file_allowed(file):
-                    print(file, '\033[2K\033[1G')
+                    print(f'\r\033[K{file}', end='', flush=True)
                     yield f'{file}\n{z.read(file).decode("utf-8")}'
