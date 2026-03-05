@@ -31,5 +31,5 @@ async def handle_message(message: cl.Message):
 
     chat_history.append({"role": "user", "content": message.content})
     chat_history.append({"role": "assistant", "content": full_response})  # ← string, pas l'objet
-
+    print(f"AI response :'{full_response}'")
     cl.user_session.set("chat_history", chat_history)

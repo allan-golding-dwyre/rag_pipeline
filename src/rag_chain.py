@@ -27,7 +27,6 @@ PROMPT_DIR = Path("prompts")
 STRICT_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_STRICT.md"
 CHATTY_PROMPT_PATH = PROMPT_DIR / "INSTRUCTION_CHATTY.md"
 
-# TODO : [ ] Batching embedding to VectorStore
 # TODO : [ ] Change reranker from HuggingFace to CohereRerank [Cohere](https://cohere.com/fr)
 
 class RAGChain:
@@ -35,9 +34,11 @@ class RAGChain:
         print("init the RAG chain")
         self.vector_store = self._setup_vector_store()
         self.retriever = self._build_retriever()
-        self.chain = self._create_chain()
+        self.chain = self.create_chain()
+        print("chain created")
 
     async def ask(self, question: Any, chat_history: List[dict], session_id = -1):
+        """ Handle the logic of asking question to the RAG Chain """
         print(f"Question asked '{question}'")
         inputs = {
             "question": question,
@@ -60,7 +61,27 @@ class RAGChain:
             async for chunk in stream:
                 yield chunk
 
+    def create_chain(self):
+        """ Create the RAG Chain object that allow us to access the AI and ask him a question with a pipeline """
+        print("Création de la chaine")
+        llm = ChatMistralAI(model_name=config.LANGUAGE_MODEL, api_key=config.MISTRAL_KEY)
+
+        # ici on recup les inputs important
+        base = RunnableParallel(
+            question=RunnableLambda(itemgetter("question")),
+            chat_history=RunnableLambda(itemgetter("chat_history")),
+            context_docs=RunnableLambda(itemgetter("question")) | self.retriever
+        )
+
+        return (base
+                | self._format_inputs()             # format history et contexts
+                | self._select_prompt_template()    # prend à partir de history le bon template
+                | llm                               # génère le message
+                | StrOutputParser()                 # l'envoie a chainlit
+                )
+
     def _build_retriever(self) :
+        """ Build the hybrid (Sparse and Dense) retriever object with top_k and threshold parameters"""
         base_retriever = self.vector_store.as_retriever(
             search_type="similarity",
             search_kwargs={"k": config.TOP_K * 2, }
@@ -75,6 +96,7 @@ class RAGChain:
 
     @staticmethod
     def _setup_vector_store() -> QdrantVectorStore:
+        """ Setup the Qdrant vector store """
         embedding = MistralAIEmbeddings(model=config.EMBEDDING_MODEL, api_key=config.MISTRAL_KEY)
         sparse_embedding = FastEmbedSparse(model_name=config.SPARSE_EMBEDDING_MODEL)
         client = QdrantClient(url=config.QDRANT_URL, api_key=config.QDRANT_KEY, port=None)
@@ -89,8 +111,9 @@ class RAGChain:
         )
 
     @staticmethod
-    def _make_chat_prompt_from_file(prompt_file_path: Path):
-        prompt_str = prompt_file_path.read_text(encoding="utf-8")
+    def _build_prompt(prompt_template_file: Path):
+        """Assemble prompt template, RAG context, chat history and human question for the IA to use it"""
+        prompt_str = prompt_template_file.read_text(encoding="utf-8")
 
         return ChatPromptTemplate.from_messages(
             [
@@ -101,42 +124,25 @@ class RAGChain:
             ]
         )
 
-    def _create_chain(self):
-        print("Création de la chaine")
-        llm = ChatMistralAI(model_name=config.LANGUAGE_MODEL, api_key=config.MISTRAL_KEY)
-
-        # ici on recup les inputs important
-        base = RunnableParallel(
-            question=RunnableLambda(itemgetter("question")),
-            chat_history=RunnableLambda(itemgetter("chat_history")),
-            context_docs=RunnableLambda(itemgetter("question")) | self.retriever
-        )
-
-        return (base
-                |   self.build_prompt_input()       # format history et contexts
-                |   self.select_prompt_template()   # prend à partir de history le bon template
-                |   llm                             # génère le message
-                |   StrOutputParser()               # l'envoie a chainlit
-        )
-
-    def select_prompt_template(self):
+    def _select_prompt_template(self):
+        """From chat history, we select the good prompt template"""
         def select_prompt(x ):
             msgs = x.get("chat_history", [])
-            # Si dans la conversation, il y un message de assistant (ia)
+            # Si un message de l'assistant (ia) est présent dans la conversation, nous allons avoir un chatty prompt
             has_assistant = any(
                 getattr(m, "role", "") == "assistant"
                 for m in msgs
             )
 
             prompt_file_path = CHATTY_PROMPT_PATH if has_assistant else STRICT_PROMPT_PATH
-            return self._make_chat_prompt_from_file(prompt_file_path)
+            return self._build_prompt(prompt_file_path)
 
         return RunnableLambda(select_prompt)
 
-    ## Génère permet juste de garder la question et formater les chats, et contexts
     @staticmethod
-    def build_prompt_input():
-        def get_message_from_role(role, msg):
+    def _format_inputs():
+        """Format the chat history and the retrieved docs from RAG"""
+        def create_message_from_role(role, msg):
             if role == "user":
                 return HumanMessage(content=msg)
             return AIMessage(content=msg)
@@ -144,7 +150,7 @@ class RAGChain:
         def format_history(history):
             last_messages = history[-8:]
             msgs = [
-                get_message_from_role(m["role"], m["content"])
+                create_message_from_role(m["role"], m["content"])
                 for m in last_messages
             ]
             return msgs
