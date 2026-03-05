@@ -2,10 +2,12 @@
 # https://nightly.link/godotengine/godot-docs/workflows/build_offline_docs/master/godot-docs-html-master.zip
 
 
-from pathlib import Path
-from typing import List, Iterable
+from typing import Iterable
 
-from src.base_documentation_loader import BaseDocumentationLoader
+from stream_unzip import stream_unzip
+from tqdm import tqdm
+
+from src.documentation_loader.base_documentation_loader import BaseDocumentationLoader
 import requests
 import zipfile
 import io
@@ -34,12 +36,26 @@ class FileFetchDocumentationLoader(BaseDocumentationLoader):
         return filepath.endswith(".html") and filepath.split("/")[-1] not in ["search.html", "404.html", "genindex.html"]
 
     def _get_html_sources(self) -> Iterable[str]:
-        response = requests.get(self.base_url)
+        response = requests.get(self.base_url, stream=True)
         response.raise_for_status()
 
-        zip_bytes = io.BytesIO(response.content)
-        with zipfile.ZipFile(zip_bytes) as z:
-            for file in z.namelist():
-                if self._is_allow_chapter(file) and self._is_file_allowed(file):
-                    print(f'\r\033[K{file}', end='', flush=True)
-                    yield f'{file}\n{z.read(file).decode("utf-8")}'
+        total = int(response.headers.get("content-length", 0))
+
+        def chunked_response():
+            with tqdm(total=total, unit="B", unit_scale=True, desc="Downloading docs") as bar:
+                for chunk in response.iter_content(chunk_size=8192):
+                    bar.update(len(chunk))
+                    yield chunk
+
+        for file_name, file_size, unzipped_chunks in stream_unzip(chunked_response()):
+            filepath = file_name.decode('utf-8')
+
+            if not self._is_allow_chapter(filepath) or not self._is_file_allowed(filepath):
+                # Consommer les chunks quand même pour ne pas bloquer le stream
+                # Car stream_unzip est un lazy génerator, donc il attend qu'on lui demande les chunks pour envoyer le reste
+                for _ in unzipped_chunks:
+                    pass
+                continue
+
+            content = b"".join(unzipped_chunks).decode('utf-8')
+            yield content

@@ -21,6 +21,7 @@ dependencies = [
     "ollama>=0.6.1",
     "qdrant-client>=1.17.0",
     "sentence-transformers>=5.2.3",
+    "stream-unzip>=0.0.101",
     "tiktoken>=0.12.0",
     "tqdm>=4.67.3",
 ]

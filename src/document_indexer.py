@@ -1,16 +1,15 @@
 from langchain_mistralai import MistralAIEmbeddings
-import uuid
 
 from tqdm import tqdm
 from rich import print
 
 from src import config
-from qdrant_client.http.models import Distance, VectorParams, SparseVectorParams, Modifier, PointStruct
+from qdrant_client.http.models import Distance, VectorParams, SparseVectorParams, Modifier
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_qdrant import QdrantVectorStore, RetrievalMode, FastEmbedSparse
 from qdrant_client import QdrantClient
 
-from src.base_documentation_loader import BaseDocumentationLoader
+from src.documentation_loader.base_documentation_loader import BaseDocumentationLoader
 
 class DocumentIndexer:
     def __init__(self, batch_size : int = 64, reset_collection = True):
@@ -71,7 +70,7 @@ class DocumentIndexer:
 
         # === Batching des chunks ===
         batch_size = self.batch_size
-        for i in tqdm(range(0, len(chunks), batch_size), desc="Embedding batches"):
+        for i in tqdm(range(0, len(chunks), batch_size), desc="Embedding batches", unit="batch"):
             batch_chunks = chunks[i:(i + batch_size)]
             self.vector_store.add_documents(batch_chunks)
 

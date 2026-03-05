@@ -1,10 +1,10 @@
 import argparse
 
 from src.document_indexer import DocumentIndexer
-from src.file_documentation_loader import FileDocumentationLoader
-from src.file_fetch_documentation_loader import FileFetchDocumentationLoader
-from src.git_documentation_loader import GitDocumentationLoader
-from src.online_documentation_loader import OnlineDocumentationLoader
+from src.documentation_loader.file_documentation_loader import FileDocumentationLoader
+from src.documentation_loader.file_fetch_documentation_loader import FileFetchDocumentationLoader
+from src.documentation_loader.git_documentation_loader import GitDocumentationLoader
+from src.documentation_loader.online_documentation_loader import OnlineDocumentationLoader
 # from rich import print
 
 def main():

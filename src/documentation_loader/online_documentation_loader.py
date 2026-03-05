@@ -10,7 +10,7 @@ from urllib3 import Retry
 
 from src import config
 from tqdm import tqdm
-from src.base_documentation_loader import BaseDocumentationLoader
+from src.documentation_loader.base_documentation_loader import BaseDocumentationLoader
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class OnlineDocumentationLoader(BaseDocumentationLoader):

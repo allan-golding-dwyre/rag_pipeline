@@ -1,7 +1,7 @@
 from pathlib import Path
-from typing import List, Iterable
+from typing import Iterable
 
-from src.base_documentation_loader import BaseDocumentationLoader
+from src.documentation_loader.base_documentation_loader import BaseDocumentationLoader
 
 
 class FileDocumentationLoader(BaseDocumentationLoader):

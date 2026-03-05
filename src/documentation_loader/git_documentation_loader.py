@@ -3,11 +3,11 @@ from typing import Iterable, List
 
 from langchain_core.documents import Document
 
-from src.base_documentation_loader import BaseDocumentationLoader
+from src.documentation_loader.base_documentation_loader import BaseDocumentationLoader
 import requests
 import zipfile
 import io
-from rich import print
+
 
 class GitDocumentationLoader(BaseDocumentationLoader):
     def __init__(self, base_url = "https://api.github.com/repos/godotengine/godot-docs/zipball/master", verbose=False):
